@@ -6,7 +6,7 @@ from PIL import Image
 import streamlit as st
 
 # ==========================================
-# 🏛️ 1. Institutional Stock Database (ฐานข้อมูลมูลค่าหุ้น)
+# 🏛️ 1. Institutional Stock Database
 # ==========================================
 STOCK_DB = {
     "EGCO": {
@@ -84,16 +84,15 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* บังคับพื้นหลังหน้าจอและ Sidebar */
     .stApp { background-color: #0b0f19; }
     [data-testid="stSidebar"] { background-color: #0f172a !important; }
     
-    /* 1. บังคับตัวหนังสือสีขาวบริสุทธิ์ทุก Element ทั่วทั้งเว็บ */
+    /* บังคับตัวหนังสือสีขาวบริสุทธิ์ทุกจุด */
     p, span, label, div, h1, h2, h3, h4, h5, h6, .stMarkdown, .stText {
         color: #FFFFFF !important;
     }
     
-    /* 2. แก้ปัญหาตัวหนังสือสีดำใน Dropdown / Selectbox ของ Sidebar */
+    /* เมนู Dropdown / Selectbox */
     div[data-baseweb="select"] > div {
         background-color: #1e293b !important;
         border-color: #334155 !important;
@@ -102,8 +101,6 @@ st.markdown(
     div[data-baseweb="select"] span, div[data-baseweb="select"] div {
         color: #FFFFFF !important;
     }
-    
-    /* รายการตัวเลือกในเมนู Dropdown ที่เด้งลงมา */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
         background-color: #1e293b !important;
         color: #FFFFFF !important;
@@ -117,14 +114,14 @@ st.markdown(
         color: #38bdf8 !important;
     }
     
-    /* 3. กล่องพิมพ์ข้อความและตัวเลข (Inputs) */
+    /* กล่องพิมพ์ตัวเลขและข้อความ */
     input, textarea {
         color: #FFFFFF !important;
         background-color: #1e293b !important;
         border: 1px solid #334155 !important;
     }
     
-    /* 4. Dashboard Metrics & ตาราง */
+    /* Dashboard Metrics & ตาราง */
     [data-testid="stMetricValue"] { color: #38bdf8 !important; font-weight: bold !important; }
     [data-testid="stMetricLabel"] { color: #FFFFFF !important; }
     
@@ -147,31 +144,44 @@ st.caption(
 )
 
 # ==========================================
-# 🔄 3. State Management & Real-time Auto-Update Engine
+# 🔄 3. State Management & Two-Way Callback Engine
 # ==========================================
-# ฟังก์ชันอัปเดตตัวแปรเมื่อเปลี่ยนชื่อหุ้นใน Dropdown
-def handle_stock_selection_change():
-  selected = st.session_state.stock_dropdown_key
+# ฟังก์ชันอัปเดตเมื่อเปลี่ยนจาก Dropdown
+def on_dropdown_stock_change():
+  selected = st.session_state.dropdown_stock_key
   if selected in STOCK_DB:
     data = STOCK_DB[selected]
-    st.session_state.input_ticker_name = selected
-    st.session_state.input_fair_value = float(data["fv"])
-    st.session_state.input_risk_tier = data["tier"]
-    st.session_state.input_curr_shares = int(data["shares"])
-    st.session_state.input_curr_avg = float(data["avg"])
-    st.session_state.input_total_budget = float(data["budget"])
+    st.session_state.ticker_name_key = selected
+    st.session_state.fair_value_key = float(data["fv"])
+    st.session_state.risk_tier_key = data["tier"]
+    st.session_state.curr_shares_key = int(data["shares"])
+    st.session_state.curr_avg_key = float(data["avg"])
+    st.session_state.total_budget_key = float(data["budget"])
 
 
-# ตั้งค่าเริ่มต้นครั้งแรก (Default First Load)
-if "input_ticker_name" not in st.session_state:
+# ฟังก์ชันอัปเดตเมื่อพิมพ์ชื่อหุ้นเองใน Text box
+def on_text_ticker_change():
+  typed = st.session_state.ticker_name_key.upper().strip()
+  if typed in STOCK_DB:
+    data = STOCK_DB[typed]
+    st.session_state.dropdown_stock_key = typed
+    st.session_state.fair_value_key = float(data["fv"])
+    st.session_state.risk_tier_key = data["tier"]
+    st.session_state.curr_shares_key = int(data["shares"])
+    st.session_state.curr_avg_key = float(data["avg"])
+    st.session_state.total_budget_key = float(data["budget"])
+
+
+# ค่าเริ่มต้นครั้งแรก (Initial Load)
+if "fair_value_key" not in st.session_state:
   init_data = STOCK_DB["EGCO"]
-  st.session_state.stock_dropdown_key = "EGCO"
-  st.session_state.input_ticker_name = "EGCO"
-  st.session_state.input_fair_value = float(init_data["fv"])
-  st.session_state.input_risk_tier = init_data["tier"]
-  st.session_state.input_curr_shares = int(init_data["shares"])
-  st.session_state.input_curr_avg = float(init_data["avg"])
-  st.session_state.input_total_budget = float(init_data["budget"])
+  st.session_state.dropdown_stock_key = "EGCO"
+  st.session_state.ticker_name_key = "EGCO"
+  st.session_state.fair_value_key = float(init_data["fv"])
+  st.session_state.risk_tier_key = init_data["tier"]
+  st.session_state.curr_shares_key = int(init_data["shares"])
+  st.session_state.curr_avg_key = float(init_data["avg"])
+  st.session_state.total_budget_key = float(init_data["budget"])
 
 # ==========================================
 # 📸 4. Gemini Vision AI Scanner (OCR พอร์ต)
@@ -208,53 +218,58 @@ with st.expander("📸 อัปโหลดรูปภาพพอร์ต (S
         first_stock = parsed_data[0]
         sym = first_stock.get("symbol", "").upper()
         if sym in STOCK_DB:
-          st.session_state.stock_dropdown_key = sym
-          handle_stock_selection_change()
-        st.session_state.input_curr_shares = int(first_stock.get("shares", 0))
-        st.session_state.input_curr_avg = float(
-            first_stock.get("avg_cost", 0.0)
-        )
+          st.session_state.dropdown_stock_key = sym
+          on_dropdown_stock_change()
+        else:
+          st.session_state.ticker_name_key = sym
+        st.session_state.curr_shares_key = int(first_stock.get("shares", 0))
+        st.session_state.curr_avg_key = float(first_stock.get("avg_cost", 0.0))
         st.rerun()
     except Exception as e:
       st.error(f"เกิดข้อผิดพลาดในการอ่านภาพ: {e}")
 
 # ==========================================
-# ⚙️ 5. Sidebar: Input Parameters (ผูก State แน่นอน 100%)
+# ⚙️ 5. Sidebar: Input Parameters (Dynamic Reactive)
 # ==========================================
 st.sidebar.header("⚙️ ข้อมูลหุ้นและงบประมาณ")
 
-# กล่องเลือกหุ้น Auto-Fill
+# 1. กล่องเลือกหุ้น Auto-Fill
 st.sidebar.selectbox(
     "เลือกหุ้นจากฐานข้อมูล (Auto-Fill):",
     options=list(STOCK_DB.keys()),
-    key="stock_dropdown_key",
-    on_change=handle_stock_selection_change,
+    key="dropdown_stock_key",
+    on_change=on_dropdown_stock_change,
 )
 
+# 2. กล่องชื่อย่อหุ้น
 custom_ticker = st.sidebar.text_input(
-    "ชื่อย่อหุ้น (Symbol):", key="input_ticker_name"
+    "ชื่อย่อหุ้น (Symbol):",
+    key="ticker_name_key",
+    on_change=on_text_ticker_change,
 ).upper()
 
+# 3. กล่อง Fair Value (อัปเดตอัตโนมัติ 100%)
 fair_value = st.sidebar.number_input(
     "มูลค่าเหมาะสม (Fair Value : บาท)",
-    key="input_fair_value",
+    key="fair_value_key",
     step=0.5,
     format="%.2f",
 )
 
+# 4. ระดับความเสี่ยง
 tier_options = ["Defensive", "Medium", "Cyclical"]
 risk_tier = st.sidebar.selectbox(
-    "ระดับความเสี่ยง (Risk Tier)", tier_options, key="input_risk_tier"
+    "ระดับความเสี่ยง (Risk Tier)", tier_options, key="risk_tier_key"
 )
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 สถานะพอร์ตปัจจุบัน")
 curr_shares = st.sidebar.number_input(
-    "จำนวนหุ้นที่มีอยู่", key="input_curr_shares", step=100
+    "จำนวนหุ้นที่มีอยู่", key="curr_shares_key", step=100
 )
 curr_avg = st.sidebar.number_input(
     "ราคาต้นทุนเฉลี่ยปัจจุบัน (บาท)",
-    key="input_curr_avg",
+    key="curr_avg_key",
     step=0.1,
     format="%.2f",
 )
@@ -264,7 +279,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("💰 งบประมาณลงทุน")
 total_budget = st.sidebar.number_input(
     "งบลงทุนทั้งหมดที่ตั้งเป้าไว้ (บาท)",
-    key="input_total_budget",
+    key="total_budget_key",
     step=10000.0,
     format="%.2f",
 )
@@ -293,7 +308,7 @@ buy_shares = [
     int(f / p) if p > 0 else 0 for f, p in zip(buy_funds, buy_prices)
 ]
 
-# Calculate Cumulative Average Cost
+# คำนวณ Cumulative Average Cost
 cum_shares = curr_shares
 cum_cost = curr_cost
 avg_costs = []
