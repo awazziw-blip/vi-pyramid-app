@@ -4,510 +4,13 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 import streamlit as st
+import yfinance as yf
 
 # ==============================================================================
-# 🏛️ 1. Master Institutional Valuation Database (ข้อมูลสำเร็จรูปที่ผ่านการคำนวณแล้ว)
-# ==============================================================================
-MASTER_STOCK_DB = {
-    "EGCO": {
-        "name": "บมจ. ผลิตไฟฟ้า",
-        "sector": "Utilities / Energy",
-        "tier": "Medium",
-        "fv": 118.00,
-        "default_shares": 1799,
-        "default_avg": 133.40,
-        "default_budget": 300000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median 10Y PE (10.5x) × EPS 11.20",
-                "Fair Value (บาท)": "117.60",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "29.40",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 5.33%, r 7.95%, g 1.50% × BVPS 210.00 (0.59x)"
-                ),
-                "Fair Value (บาท)": "124.60",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "31.15",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 6.50 × (1 + 0.015) / (0.0795 - 0.015)",
-                "Fair Value (บาท)": "102.29",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "25.57",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "2-Stage Dividend Discount Model (Growth 1.5%)",
-                "Fair Value (บาท)": "127.50",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "31.88",
-            },
-        ],
-    },
-    "TISCO": {
-        "name": "บมจ. ทิสโก้ไฟแนนเชียลกรุ๊ป",
-        "sector": "Banking",
-        "tier": "Defensive",
-        "fv": 110.00,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median 10Y PE (11.5x) × EPS 8.00",
-                "Fair Value (บาท)": "92.00",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "18.40",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 14.54%, r 7.50%, g 1.00% × BVPS 55.00 (2.08x)"
-                ),
-                "Fair Value (บาท)": "114.40",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "34.32",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 7.75 × (1 + 0.010) / (0.0750 - 0.010)",
-                "Fair Value (บาท)": "120.42",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "30.10",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "2-Stage Dividend Discount Model (Payout 96.8%)",
-                "Fair Value (บาท)": "108.72",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "27.18",
-            },
-        ],
-    },
-    "SAWAD": {
-        "name": "บมจ. ศรีสวัสดิ์ คอร์ปอเรชั่น",
-        "sector": "Finance / Non-Bank",
-        "tier": "Medium",
-        "fv": 38.50,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Normalized PE (12.0x) × EPS 3.65",
-                "Fair Value (บาท)": "43.80",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "10.95",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 14.60%, r 10.05%, g 2.50% × BVPS 25.00 (1.60x)"
-                ),
-                "Fair Value (บาท)": "40.00",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "12.00",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 1.80 × (1 + 0.025) / (0.1005 - 0.025)",
-                "Fair Value (บาท)": "24.44",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "4.89",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "Residual Income / 2-Stage Cash Flow",
-                "Fair Value (บาท)": "42.64",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "10.66",
-            },
-        ],
-    },
-    "SPA": {
-        "name": "บมจ. สยามเวลเนสกรุ๊ป",
-        "sector": "Services / Tourism",
-        "tier": "Medium",
-        "fv": 7.00,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Normalized PE (26.0x) × EPS 0.36",
-                "Fair Value (บาท)": "9.36",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "2.81",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 18.95%, r 9.70%, g 2.50% × BVPS 1.90 (2.28x)"
-                ),
-                "Fair Value (บาท)": "4.33",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "0.87",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 0.20 × (1 + 0.025) / (0.0970 - 0.025)",
-                "Fair Value (บาท)": "2.85",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "0.57",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "2-Stage Cash Flow (Growth 5Y @ 8% + Terminal)",
-                "Fair Value (บาท)": "9.17",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "2.75",
-            },
-        ],
-    },
-    "WHAUP": {
-        "name": "บมจ. ดับบลิวเอชเอ ยูทิลิตี้ส์ แอนด์ พาวเวอร์",
-        "sector": "Utilities / Industrial",
-        "tier": "Defensive",
-        "fv": 4.80,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median PE (11.5x) × EPS 0.40",
-                "Fair Value (บาท)": "4.60",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "1.38",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 11.11%, r 7.50%, g 2.00% × BVPS 3.60 (1.66x)"
-                ),
-                "Fair Value (บาท)": "5.96",
-                "น้ำหนัก": "15%",
-                "Blended (บาท)": "0.89",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 0.25 × (1 + 0.020) / (0.0750 - 0.020)",
-                "Fair Value (บาท)": "4.64",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "1.39",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "Dividend / FCFE Discount 5Y + Terminal",
-                "Fair Value (บาท)": "4.60",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "1.15",
-            },
-        ],
-    },
-    "BDMS": {
-        "name": "บมจ. กรุงเทพดุสิตเวชการ",
-        "sector": "Healthcare",
-        "tier": "Defensive",
-        "fv": 27.00,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median PE (27.0x) × EPS 1.00",
-                "Fair Value (บาท)": "27.00",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "8.10",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 15.38%, r 7.50%, g 3.50% × BVPS 6.50 (2.97x)"
-                ),
-                "Fair Value (บาท)": "19.31",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "3.86",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 0.75 × (1 + 0.035) / (0.0750 - 0.035)",
-                "Fair Value (บาท)": "19.41",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "3.88",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "FCFE 2-Stage Growth @ 6.5% + Terminal @ 3.5%",
-                "Fair Value (บาท)": "37.20",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "11.16",
-            },
-        ],
-    },
-    "CPALL": {
-        "name": "บมจ. ซีพี ออลล์",
-        "sector": "Commerce / Consumer",
-        "tier": "Defensive",
-        "fv": 65.00,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median PE (27.0x) × EPS 2.40",
-                "Fair Value (บาท)": "64.80",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "19.44",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 17.14%, r 7.60%, g 3.00% × BVPS 14.00 (3.07x)"
-                ),
-                "Fair Value (บาท)": "43.04",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "8.61",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 1.35 × (1 + 0.030) / (0.0760 - 0.030)",
-                "Fair Value (บาท)": "30.23",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "6.05",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "FCFE 2-Stage Growth @ 7.0% + Terminal @ 3.0%",
-                "Fair Value (บาท)": "103.00",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "30.90",
-            },
-        ],
-    },
-    "ADVANC": {
-        "name": "บมจ. แอดวานซ์ อินโฟร์ เซอร์วิส",
-        "sector": "Defensive ICT",
-        "tier": "Defensive",
-        "fv": 403.00,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median PE (25.0x) × EPS 13.00",
-                "Fair Value (บาท)": "325.00",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "81.25",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 39.39%, r 7.50%, g 2.50% × BVPS 33.00 (7.38x)"
-                ),
-                "Fair Value (บาท)": "243.47",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "48.69",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 10.50 × (1 + 0.025) / (0.0750 - 0.025)",
-                "Fair Value (บาท)": "215.25",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "53.81",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "High FCF Margin Infrastructure Model",
-                "Fair Value (บาท)": "730.83",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "219.25",
-            },
-        ],
-    },
-    "WHART": {
-        "name": "ทรัสต์เพื่อการลงทุนในอสังหาริมทรัพย์และสิทธิการเช่า ดับบลิวเอชเอ พรีเมี่ยม โกรท",
-        "sector": "Industrial REIT",
-        "tier": "Defensive",
-        "fv": 11.20,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median P/E (13.5x) × EPS 0.82",
-                "Fair Value (บาท)": "11.07",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "2.77",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 7.59%, r 7.50%, g 1.00% × NAV 10.80 (1.01x)"
-                ),
-                "Fair Value (บาท)": "10.95",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "2.74",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPU 0.79 × (1 + 0.010) / (0.0750 - 0.010)",
-                "Fair Value (บาท)": "12.27",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "3.07",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "REIT DPU Discount Model (Terminal @ 1.0%)",
-                "Fair Value (บาท)": "10.51",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "2.63",
-            },
-        ],
-    },
-    "AOT": {
-        "name": "บมจ. ท่าอากาศยานไทย",
-        "sector": "Transportation / Tourism",
-        "tier": "Medium",
-        "fv": 64.00,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median PE (38.0x) × EPS 1.45",
-                "Fair Value (บาท)": "55.10",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "13.78",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 16.50%, r 8.50%, g 3.00% × BVPS 8.80 (2.45x)"
-                ),
-                "Fair Value (บาท)": "21.60",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "4.32",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 0.79 × (1 + 0.030) / (0.0850 - 0.030)",
-                "Fair Value (บาท)": "14.80",
-                "น้ำหนัก": "15%",
-                "Blended (บาท)": "2.22",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "Monopoly Concession Free Cash Flow Model",
-                "Fair Value (บาท)": "109.20",
-                "น้ำหนัก": "40%",
-                "Blended (บาท)": "43.68",
-            },
-        ],
-    },
-    "LH": {
-        "name": "บมจ. แลนด์แอนด์เฮ้าส์",
-        "sector": "Property Development",
-        "tier": "Medium",
-        "fv": 6.20,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Normalized PE (11.0x) × EPS 0.52",
-                "Fair Value (บาท)": "5.72",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "1.43",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 12.00%, r 8.80%, g 1.50% × BVPS 4.20 (1.44x)"
-                ),
-                "Fair Value (บาท)": "6.04",
-                "น้ำหนัก": "25%",
-                "Blended (บาท)": "1.51",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 0.45 × (1 + 0.015) / (0.0880 - 0.015)",
-                "Fair Value (บาท)": "6.26",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "1.88",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "Hotel & Rental Asset Cash Flow Valuation",
-                "Fair Value (บาท)": "6.90",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "1.38",
-            },
-        ],
-    },
-    "WHA": {
-        "name": "บมจ. ดับบลิวเอชเอ คอร์ปอเรชั่น",
-        "sector": "Industrial Estate",
-        "tier": "Medium",
-        "fv": 5.60,
-        "default_shares": 0,
-        "default_avg": 0.0,
-        "default_budget": 100000.0,
-        "models": [
-            {
-                "โมเดลประเมินมูลค่า": "1. Historical P/E",
-                "ตัวแปรที่ใช้": "Median PE (17.5x) × EPS 0.31",
-                "Fair Value (บาท)": "5.43",
-                "น้ำหนัก": "30%",
-                "Blended (บาท)": "1.63",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "2. Justified PBV",
-                "ตัวแปรที่ใช้": (
-                    "ROE 13.50%, r 9.00%, g 2.50% × BVPS 2.45 (1.69x)"
-                ),
-                "Fair Value (บาท)": "4.15",
-                "น้ำหนัก": "20%",
-                "Blended (บาท)": "0.83",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "3. Gordon DDM",
-                "ตัวแปรที่ใช้": "DPS 0.18 × (1 + 0.025) / (0.0900 - 0.025)",
-                "Fair Value (บาท)": "2.84",
-                "น้ำหนัก": "15%",
-                "Blended (บาท)": "0.43",
-            },
-            {
-                "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
-                "ตัวแปรที่ใช้": "Data Center & Land Transfer Cash Flow",
-                "Fair Value (บาท)": "7.74",
-                "น้ำหนัก": "35%",
-                "Blended (บาท)": "2.71",
-            },
-        ],
-    },
-}
-
-# ==============================================================================
-# 🎨 2. Strict Institutional Dark Theme & Pure White Text CSS
+# 🎨 1. Institutional Dark Theme & Strict White Text CSS
 # ==============================================================================
 st.set_page_config(
-    page_title="Institutional VI Valuation & Inverted Pyramid Engine",
+    page_title="Real-time VI Valuation & Pyramid Engine",
     page_icon="🛡️",
     layout="wide",
 )
@@ -518,34 +21,12 @@ st.markdown(
     .stApp { background-color: #0b0f19; }
     [data-testid="stSidebar"] { background-color: #0f172a !important; }
     
-    /* บังคับตัวหนังสือสีขาวบริสุทธิ์ (#FFFFFF) ทั่วทั้งระบบ */
+    /* บังคับตัวหนังสือสีขาวบริสุทธิ์ (#FFFFFF) ทุกจุด */
     p, span, label, div, h1, h2, h3, h4, h5, h6, .stMarkdown, .stText {
         color: #FFFFFF !important;
     }
     
-    /* Dropdown / Selectbox ปรับสีขาวชัดเจน */
-    div[data-baseweb="select"] > div {
-        background-color: #1e293b !important;
-        border-color: #334155 !important;
-        color: #FFFFFF !important;
-    }
-    div[data-baseweb="select"] span, div[data-baseweb="select"] div {
-        color: #FFFFFF !important;
-    }
-    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[role="listbox"] {
-        background-color: #1e293b !important;
-        color: #FFFFFF !important;
-    }
-    li[role="option"] {
-        background-color: #1e293b !important;
-        color: #FFFFFF !important;
-    }
-    li[role="option"]:hover, li[aria-selected="true"] {
-        background-color: #334155 !important;
-        color: #38bdf8 !important;
-    }
-    
-    /* กล่องข้อความและตัวเลขอินพุต */
+    /* กล่องอินพุต */
     input, textarea {
         color: #FFFFFF !important;
         background-color: #1e293b !important;
@@ -569,32 +50,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("🛡️ Institutional VI Valuation & Inverted Pyramid Engine")
+st.title("🛡️ Institutional Real-Time VI Valuation & Pyramid Engine")
 st.caption(
-    "ระบบประเมินมูลค่าหุ้นอัตโนมัติ คำนวณไม้ซื้อพีระมิดกลับหัว 15/20/30/35% และ"
-    " No-Loss TP Gate"
+    "ระบบดึงงบการเงินสดจากตลาดหลักทรัพย์ ประเมิน 4 โมเดล Real-time คำนวณพีระมิด"
+    " 15/20/30/35% และ No-Loss TP Gate"
 )
 
 # ==============================================================================
-# 🔄 3. State Management & Instant Auto-Fill
-# ==============================================================================
-stock_names = list(MASTER_STOCK_DB.keys())
-
-
-def apply_selected_stock():
-  chosen = st.session_state.stock_choice
-  data = MASTER_STOCK_DB[chosen]
-  st.session_state.shares_val = data["default_shares"]
-  st.session_state.avg_val = data["default_avg"]
-  st.session_state.budget_val = data["default_budget"]
-
-
-if "stock_choice" not in st.session_state:
-  st.session_state.stock_choice = "EGCO"
-  apply_selected_stock()
-
-# ==============================================================================
-# 📸 4. Gemini Vision OCR Scanner (อ่านภาพพอร์ตอัตโนมัติ)
+# 📸 2. Gemini Vision OCR Scanner (อ่านภาพพอร์ต)
 # ==============================================================================
 with st.expander("📸 อัปโหลดรูปภาพพอร์ต (Streaming Screenshot Scanner)", expanded=False):
   uploaded_file = st.file_uploader(
@@ -624,9 +87,9 @@ with st.expander("📸 อัปโหลดรูปภาพพอร์ต (S
       st.json(parsed)
 
       if parsed:
-        sym = parsed[0].get("symbol", "").upper()
-        if sym in MASTER_STOCK_DB:
-          st.session_state.stock_choice = sym
+        st.session_state.target_ticker = (
+            parsed[0].get("symbol", "EGCO").upper()
+        )
         st.session_state.shares_val = int(parsed[0].get("shares", 0))
         st.session_state.avg_val = float(parsed[0].get("avg_cost", 0.0))
         st.rerun()
@@ -634,43 +97,43 @@ with st.expander("📸 อัปโหลดรูปภาพพอร์ต (S
       st.error(f"เกิดข้อผิดพลาดในการอ่านภาพ: {e}")
 
 # ==============================================================================
-# ⚙️ 5. Sidebar: One-Click Stock Selector & Portfolio Input
+# ⚙️ 3. Sidebar: Real-time Stock Search & Portfolio Inputs
 # ==============================================================================
-st.sidebar.header("🎯 เลือกหุ้นที่ต้องการวิเคราะห์")
+st.sidebar.header("🎯 ค้นหาหุ้น Real-Time")
 
-# 1. กล่องเลือกหุ้น (เลือกปุ๊บคำนวณใหม่ทั้งระบบทันที)
-selected_stock = st.sidebar.selectbox(
-    "เลือกหุ้นจากฐานข้อมูลสถาบัน:",
-    options=stock_names,
-    key="stock_choice",
-    on_change=apply_selected_stock,
-)
+if "target_ticker" not in st.session_state:
+  st.session_state.target_ticker = "EGCO"
+if "shares_val" not in st.session_state:
+  st.session_state.shares_val = 0
+if "avg_val" not in st.session_state:
+  st.session_state.avg_val = 0.0
 
-active_info = MASTER_STOCK_DB[selected_stock]
-fair_value = active_info["fv"]
-risk_tier = active_info["tier"]
-
-st.sidebar.info(
-    f"🏢 **{active_info['name']}**\n\n"
-    f"🔹 **กลุ่มอุตสาหกรรม:** {active_info['sector']}\n\n"
-    f"⭐ **Fair Value:** **{fair_value:.2f} บาท**\n\n"
-    f"🛡️ **Risk Tier:** **{risk_tier}**"
-)
+ticker_input = st.sidebar.text_input(
+    "พิมพ์ชื่อย่อหุ้น (เช่น PTT, CPALL, BDMS, MINT):",
+    value=st.session_state.target_ticker,
+).upper().strip()
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("📊 ข้อมูลพอร์ต (ปรับได้อิสระ)")
+st.sidebar.subheader("📊 ข้อมูลพอร์ต")
 curr_shares = st.sidebar.number_input(
-    "จำนวนหุ้นที่มีอยู่เดิม", key="shares_val", step=100
+    "จำนวนหุ้นที่มีอยู่เดิม",
+    value=st.session_state.shares_val,
+    step=100,
+    key="curr_shares_input",
 )
 curr_avg = st.sidebar.number_input(
-    "ราคาต้นทุนเฉลี่ยเดิม (บาท)", key="avg_val", step=0.1, format="%.2f"
+    "ราคาต้นทุนเฉลี่ยเดิม (บาท)",
+    value=st.session_state.avg_val,
+    step=0.1,
+    format="%.2f",
+    key="curr_avg_input",
 )
 curr_cost = curr_shares * curr_avg
 
 st.sidebar.subheader("💰 งบประมาณลงทุน")
 total_budget = st.sidebar.number_input(
     "งบลงทุนทั้งหมดที่ตั้งเป้าไว้ (บาท)",
-    key="budget_val",
+    value=100000.0 if curr_cost == 0 else curr_cost + 100000.0,
     step=10000.0,
     format="%.2f",
 )
@@ -678,20 +141,124 @@ pyramid_budget = max(0.0, total_budget - curr_cost)
 st.sidebar.info(f"💵 งบสำรองซื้อพีระมิด: **{pyramid_budget:,.2f} บาท**")
 
 # ==============================================================================
-# 📐 6. Execution Engine: Dynamic MOS, Pyramid & No-Loss TP
+# 🌐 4. Live Financial Data Fetching Engine (Yahoo Finance API)
 # ==============================================================================
-# กำหนด MOS และ TP ตาม Risk Tier
-if risk_tier == "Defensive":
+@st.cache_data(ttl=3600)  # แคชข้อมูล 1 ชั่วโมงเพื่อความเร็ว
+def fetch_live_stock_data(symbol):
+  clean_sym = symbol.replace(".BK", "")
+  yf_sym = f"{clean_sym}.BK"
+  tk = yf.Ticker(yf_sym)
+  info = tk.info
+
+  if not info or "regularMarketPrice" not in info:
+    # กรณีดึงตรงไม่เจอ พยายามดึงแบบ fallback
+    return None
+
+  # สกัดตัวเลขสำคัญ
+  market_price = info.get("regularMarketPrice") or info.get("currentPrice", 0.0)
+  eps = (
+      info.get("trailingEps")
+      or info.get("forwardEps")
+      or (market_price / max(1.0, info.get("trailingPE", 15.0)))
+  )
+  bvps = info.get("bookValue") or (
+      market_price / max(0.5, info.get("priceToBook", 1.5))
+  )
+  dps = info.get("dividendRate") or info.get("trailingAnnualDividendRate") or 0.0
+
+  # ถ้าไม่มีปันผล ให้ประมาณการ Conservative Yield 2.5%
+  if dps == 0.0 and market_price > 0:
+    dps = market_price * 0.025
+
+  pe = info.get("trailingPE") or info.get("forwardPE") or 15.0
+  beta = info.get("beta") or 0.85
+  company_name = info.get("longName") or info.get("shortName") or clean_sym
+  sector = info.get("sector") or "General"
+
+  return {
+      "symbol": clean_sym,
+      "name": company_name,
+      "sector": sector,
+      "price": float(market_price),
+      "eps": float(eps),
+      "bvps": float(bvps),
+      "dps": float(dps),
+      "pe": float(pe),
+      "beta": float(beta),
+  }
+
+
+# โหลดข้อมูล Real-time
+with st.spinner(f"กำลังดึงข้อมูลงบการเงินสดของ {ticker_input} จากตลาดหลักทรัพย์..."):
+  stock_data = fetch_live_stock_data(ticker_input)
+
+if stock_data is None or stock_data["eps"] <= 0:
+  st.error(
+      f"❌ ไม่พบข้อมูลหุ้นย่อ '{ticker_input}' ในตลาด หรือหุ้นมีผลการดำเนินงานขาดทุน"
+      " กรุณาตรวจสอบชื่อย่อหุ้นอีกครั้ง"
+  )
+  st.stop()
+
+# ==============================================================================
+# 🧮 5. Layer 1: Real-Time 4-Model Valuation Matrix Engine
+# ==============================================================================
+eps = max(0.01, stock_data["eps"])
+bvps = max(0.01, stock_data["bvps"])
+dps = max(0.0, stock_data["dps"])
+pe = max(5.0, min(35.0, stock_data["pe"]))  # Normalization Cap 5x - 35x
+beta = max(0.40, min(1.80, stock_data["beta"]))
+
+# Dynamic Cost of Equity (r) & Growth (g)
+rf = 0.020  # Risk Free 2.0%
+erp = 0.070  # ERP 7.0%
+cost_of_equity = max(0.075, rf + (beta * erp))  # Conservative Floor 7.5%
+roe = min(0.30, eps / bvps)  # Normalization Cap ROE 30%
+payout = min(0.90, dps / eps) if eps > 0 else 0.50
+growth_g = max(0.01, min(0.035, roe * (1 - payout)))  # Cap Sustainable g 1.0% - 3.5%
+
+# 1. Historical PE Model
+fv_pe = eps * pe
+
+# 2. Justified PBV Model = ((ROE - g) / (r - g)) * BVPS
+if cost_of_equity > growth_g:
+  justified_pbv = max(0.5, (roe - growth_g) / (cost_of_equity - growth_g))
+  fv_pbv = justified_pbv * bvps
+else:
+  fv_pbv = bvps * 1.5
+
+# 3. Gordon DDM Model = DPS * (1 + g) / (r - g)
+if dps > 0 and cost_of_equity > growth_g:
+  fv_ddm = (dps * (1 + growth_g)) / (cost_of_equity - growth_g)
+else:
+  fv_ddm = fv_pe * 0.85
+
+# 4. DCF 2-Stage Model (5Y Forecast + Terminal)
+d_proj = [dps * ((1 + 0.04) ** t) for t in range(1, 6)]
+pv_d = sum([d / ((1 + cost_of_equity) ** t) for t, d in enumerate(d_proj, 1)])
+term_val = (d_proj[-1] * (1 + growth_g)) / (cost_of_equity - growth_g)
+pv_term = term_val / ((1 + cost_of_equity) ** 5)
+fv_dcf = pv_d + pv_term
+
+# Blended Fair Value
+fair_value = (fv_pe * 0.25) + (fv_pbv * 0.25) + (fv_ddm * 0.25) + (fv_dcf * 0.25)
+
+# Risk Tiering
+if beta <= 0.75:
+  risk_tier = "Defensive"
   mos_rates = [0.12, 0.16, 0.20, 0.24]
   tp_rates = [0.12, 0.16, 0.20]
-elif risk_tier == "Medium":
+elif beta <= 1.10:
+  risk_tier = "Medium"
   mos_rates = [0.18, 0.27, 0.36, 0.45]
   tp_rates = [0.18, 0.25, 0.32]
 else:
+  risk_tier = "Cyclical"
   mos_rates = [0.25, 0.36, 0.48, 0.60]
   tp_rates = [0.25, 0.35, 0.45]
 
-# คำนวณไม้ซื้อพีระมิดกลับหัว (15%, 20%, 30%, 35%)
+# ==============================================================================
+# 📐 6. Execution Engine: Dynamic MOS, Pyramid & No-Loss TP
+# ==============================================================================
 buy_alloc = [0.15, 0.20, 0.30, 0.35]
 buy_prices = [fair_value * (1 - r) for r in mos_rates]
 buy_funds = [pyramid_budget * a for a in buy_alloc]
@@ -699,7 +266,7 @@ buy_shares = [
     int(f / p) if p > 0 else 0 for f, p in zip(buy_funds, buy_prices)
 ]
 
-# คำนวณต้นทุนเฉลี่ยสะสมรายไม้ (Weighted Cumulative Cost)
+# Cumulative Average Cost
 cum_s = curr_shares
 cum_c = curr_cost
 avg_costs = []
@@ -710,13 +277,13 @@ for s, p in zip(buy_shares, buy_prices):
 
 final_avg_price = avg_costs[-1] if avg_costs else curr_avg
 
-# คำนวณจุดขาย TP 1-3 พร้อมระบบ No-Loss TP Gate
+# Target Prices & No-Loss TP
 tp_prices = [fair_value * (1 + r) for r in tp_rates]
 tp_alloc = [0.30, 0.35, 0.35]
 
 table_rows = []
 
-# แถว TP3 -> TP2 -> TP1
+# Take Profit Rows (TP3 -> TP2 -> TP1)
 for i in [2, 1, 0]:
   tp_p = tp_prices[i]
   alloc_pct = tp_alloc[i] * 100
@@ -755,10 +322,10 @@ for i in [2, 1, 0]:
         ),
     })
 
-# แถว Fair Value
+# Fair Value Row
 table_rows.append({
     "ประเภทคำสั่ง": "⚖️ Fair Value",
-    "โซนกลยุทธ์": "Intrinsic",
+    "โซนกลยุทธ์": "Intrinsic (Real-time)",
     "ราคาเป้าหมาย (บาท)": f"{fair_value:.2f}",
     "จำนวนหุ้น (เข้า / ออก)": "-",
     "สัดส่วน Action (%)": "-",
@@ -766,11 +333,11 @@ table_rows.append({
     "เงินสะสม / เงินรับรวม (บาท)": "-",
     "ทุนเฉลี่ย / กำไรสุทธิ (บาท)": "-",
     "แผนปฏิบัติการและผลลัพธ์เชิงตัวเลข": (
-        "มูลค่าเหมาะสมตามปัจจัยพื้นฐาน (จุดสมดุล)"
+        "มูลค่าเหมาะสมจากการคำนวณสด 4 โมเดล"
     ),
 })
 
-# แถว Current Base
+# Current Base Row
 table_rows.append({
     "ประเภทคำสั่ง": "⚪ Current Base",
     "โซนกลยุทธ์": "ต้นทุนปัจจุบัน",
@@ -785,7 +352,7 @@ table_rows.append({
     ),
 })
 
-# แถว Buy Pyramid (MOS 1 -> MOS 4)
+# Buy Pyramid Rows (MOS 1 -> MOS 4)
 running_cost = curr_cost
 for idx, (p, s, f, avg_c, r) in enumerate(
     zip(buy_prices, buy_shares, buy_funds, avg_costs, mos_rates)
@@ -807,63 +374,108 @@ for idx, (p, s, f, avg_c, r) in enumerate(
 
 df_output = pd.DataFrame(table_rows)
 
-# ตาราง Layer 1 Valuation Matrix
-models_list = list(active_info["models"])
-models_list.append({
-    "โมเดลประเมินมูลค่า": "⭐ สรุปมูลค่าเหมาะสมสุทธิ",
-    "ตัวแปรที่ใช้": "ผลรวมถ่วงน้ำหนัก 4 โมเดล (Weighted Matrix)",
-    "Fair Value (บาท)": f"{fair_value:.2f}",
-    "น้ำหนัก": "100%",
-    "Blended (บาท)": f"{fair_value:.2f}",
-})
-df_valuation = pd.DataFrame(models_list)
+# ตาราง Valuation Breakdown
+df_valuation = pd.DataFrame([
+    {
+        "โมเดลประเมินมูลค่า": "1. Historical P/E",
+        "สูตรและตัวแปร Real-time": f"EPS {eps:.2f} × PE {pe:.1f}x",
+        "Fair Value (บาท)": f"{fv_pe:.2f}",
+        "น้ำหนัก": "25%",
+        "Blended (บาท)": f"{fv_pe*0.25:.2f}",
+    },
+    {
+        "โมเดลประเมินมูลค่า": "2. Justified PBV",
+        "สูตรและตัวแปร Real-time": (
+            f"ROE {roe*100:.1f}%, r {cost_of_equity*100:.1f}%, BVPS {bvps:.2f}"
+        ),
+        "Fair Value (บาท)": f"{fv_pbv:.2f}",
+        "น้ำหนัก": "25%",
+        "Blended (บาท)": f"{fv_pbv*0.25:.2f}",
+    },
+    {
+        "โมเดลประเมินมูลค่า": "3. Gordon DDM",
+        "สูตรและตัวแปร Real-time": (
+            f"DPS {dps:.2f}, g {growth_g*100:.1f}%, r"
+            f" {cost_of_equity*100:.1f}%"
+        ),
+        "Fair Value (บาท)": f"{fv_ddm:.2f}",
+        "น้ำหนัก": "25%",
+        "Blended (บาท)": f"{fv_ddm*0.25:.2f}",
+    },
+    {
+        "โมเดลประเมินมูลค่า": "4. DCF 2-Stage",
+        "สูตรและตัวแปร Real-time": (
+            f"5Y Dividend PV + Terminal @ g {growth_g*100:.1f}%"
+        ),
+        "Fair Value (บาท)": f"{fv_dcf:.2f}",
+        "น้ำหนัก": "25%",
+        "Blended (บาท)": f"{fv_dcf*0.25:.2f}",
+    },
+    {
+        "โมเดลประเมินมูลค่า": "⭐ สรุปมูลค่าเหมาะสมสุทธิ",
+        "สูตรและตัวแปร Real-time": (
+            "ผลรวมถ่วงน้ำหนัก 4 โมเดล (Weighted Blended)"
+        ),
+        "Fair Value (บาท)": f"{fair_value:.2f}",
+        "น้ำหนัก": "100%",
+        "Blended (บาท)": f"{fair_value:.2f}",
+    },
+])
 
 # ==============================================================================
-# 📊 7. Dashboard Header Metrics & Tables
+# 📊 7. Render Output Dashboard
 # ==============================================================================
+st.info(
+    f"🏢 **{stock_data['name']}** ({stock_data['symbol']}) |"
+    f" กลุ่มอุตสาหกรรม: **{stock_data['sector']}** | ราคาตลาดล่าสุด:"
+    f" **{stock_data['price']:.2f} บาท** | Risk Tier: **{risk_tier}**"
+)
+
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("ชื่อหุ้น", selected_stock)
-col2.metric("มูลค่าเหมาะสม (Fair Value)", f"{fair_value:.2f} บาท")
+col1.metric("ชื่อหุ้น", stock_data["symbol"])
+col2.metric("Fair Value คำนวณสด", f"{fair_value:.2f} บาท")
 col3.metric("ต้นทุนเฉลี่ยเดิม", f"{curr_avg:.2f} บาท")
 col4.metric("ต้นทุนเฉลี่ยใหม่ (ซื้อครบ 4 ไม้)", f"{final_avg_price:.2f} บาท")
 
-st.markdown("### 📐 Layer 1: ตารางแจกแจงผลประเมินมูลค่า 4 โมเดล (Valuation Matrix)")
+st.markdown(
+    "### 📐 Layer 1: ผลประเมินมูลค่า 4 โมเดลแบบ Real-time (Valuation Matrix)"
+)
 st.table(df_valuation)
 
 st.markdown(
     "### 📊 Layer 2 & 3: ตารางแผนการลงทุน Pyramid ครบวงจรแบบบูรณาการ"
-    f" ({selected_stock})"
+    f" ({stock_data['symbol']})"
 )
 st.table(df_output)
 
-# ==============================================================================
-# 📥 8. Export Functions (Excel & CSV)
-# ==============================================================================
+# Download Section
 st.markdown("### 📥 ดาวน์โหลดรายงานแผนการลงทุน")
 b1, b2 = st.columns(2)
 
 excel_buffer = io.BytesIO()
 with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
   df_valuation.to_excel(
-      writer, index=False, sheet_name=f"Valuation_{selected_stock}"
+      writer, index=False, sheet_name=f"Valuation_{stock_data['symbol']}"
   )
-  df_output.to_excel(writer, index=False, sheet_name=f"Plan_{selected_stock}")
+  df_output.to_excel(
+      writer, index=False, sheet_name=f"Plan_{stock_data['symbol']}"
+  )
 excel_data = excel_buffer.getvalue()
 
 csv_data = df_output.to_csv(index=False).encode("utf-8-sig")
 
 with b1:
   st.download_button(
-      label=f"📊 ดาวน์โหลดเป็น Excel (.xlsx) - {selected_stock}",
+      label=f"📊 ดาวน์โหลดเป็น Excel (.xlsx) - {stock_data['symbol']}",
       data=excel_data,
-      file_name=f"VI_Plan_{selected_stock}.xlsx",
+      file_name=f"VI_Realtime_Plan_{stock_data['symbol']}.xlsx",
       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   )
 
 with b2:
   st.download_button(
-      label=f"📄 ดาวน์โหลดเป็น CSV (.csv) - {selected_stock}",
+      label=f"📄 ดาวน์โหลดเป็น CSV (.csv) - {stock_data['symbol']}",
       data=csv_data,
-      file_name=f"VI_Plan_{selected_stock}.csv",
+      file_name=f"VI_Realtime_Plan_{stock_data['symbol']}.csv",
       mime="text/csv",
   )
