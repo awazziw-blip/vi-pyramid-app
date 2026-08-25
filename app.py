@@ -1,3 +1,4 @@
+import io
 import json
 import numpy as np
 import pandas as pd
@@ -16,15 +17,15 @@ st.markdown(
 <style>
     .stApp { background-color: #0b0f19; color: #e2e8f0; }
     .metric-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 15px; margin-bottom: 10px; }
-    .status-badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; }
     table { width: 100% !important; border-collapse: collapse; }
     th { background-color: #1e293b !important; color: #38bdf8 !important; }
+    .stDownloadButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-st.title("🛡️ Institutional VI Engine & Portfolio Vision Scanner")
+st.title("🛡️ Institutional VI Engine & Portfolio Scanner")
 st.caption(
     "ระบบประเมินมูลค่าหุ้น จัดการไม้ซื้อแบบพีระมิดกลับหัว และระบบจุดขาย No-Loss"
     " TP Gate"
@@ -94,7 +95,7 @@ st.sidebar.info(f"💵 งบสำรองสำหรับซื้อพี
 # ==========================================
 # 📐 4. Core Mathematical Engine
 # ==========================================
-# 1) MOS Intervals
+# 1) Dynamic MOS & TP Intervals
 if risk_tier == "Defensive":
   mos_rates = [0.12, 0.16, 0.20, 0.24]
   tp_rates = [0.12, 0.16, 0.20]
@@ -130,14 +131,13 @@ tp_alloc = [0.30, 0.35, 0.35]
 
 table_rows = []
 
-# --- แถวฝั่ง Take Profit (เรียง TP3 -> TP2 -> TP1) ---
+# --- แถว Take Profit (เรียง TP3 -> TP2 -> TP1) ---
 for i in [2, 1, 0]:
   tp_p = tp_prices[i]
   alloc_pct = tp_alloc[i] * 100
   tp_name = f"TP {i+1} ({'Peak' if i==2 else 'Mid' if i==1 else 'Base'})"
 
   if curr_shares > 0 and tp_p > curr_avg:
-    # ขายทำกำไรได้
     s_sell = int(curr_shares * tp_alloc[i])
     val_sell = s_sell * tp_p
     profit = (tp_p - curr_avg) * s_sell
@@ -156,7 +156,6 @@ for i in [2, 1, 0]:
         ),
     })
   else:
-    # ติด No-Loss Gate หรือไม่มีหุ้น
     table_rows.append({
         "ประเภทคำสั่ง": "🔴 Take Profit",
         "โซนกลยุทธ์": tp_name,
@@ -201,7 +200,7 @@ table_rows.append({
     ),
 })
 
-# --- แถวฝั่ง Buy Pyramid (MOS 1 -> MOS 4) ---
+# --- แถว Buy Pyramid (MOS 1 -> MOS 4) ---
 running_cost = curr_cost
 for idx, (p, s, f, avg_c, r) in enumerate(
     zip(buy_prices, buy_shares, buy_funds, avg_costs, mos_rates)
@@ -234,3 +233,34 @@ col4.metric("ต้นทุนเฉลี่ยใหม่ (เมื่อ�
 
 st.markdown("### 📊 ตารางแผนการลงทุน Pyramid ครบวงจรแบบบูรณาการ")
 st.table(df_output)
+
+# ==========================================
+# 📥 6. Export Functions (Excel & CSV)
+# ==========================================
+st.markdown("### 📥 ดาวน์โหลดรายงานแผนการลงทุน")
+btn_col1, btn_col2 = st.columns(2)
+
+# ฟังก์ชันแปลงเป็น Excel ใน Memory
+excel_buffer = io.BytesIO()
+with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+  df_output.to_excel(writer, index=False, sheet_name=f"Plan_{ticker}")
+excel_data = excel_buffer.getvalue()
+
+# ฟังก์ชันแปลงเป็น CSV (utf-8-sig รองรับภาษาไทยใน Excel)
+csv_data = df_output.to_csv(index=False).encode("utf-8-sig")
+
+with btn_col1:
+  st.download_button(
+      label=f"📊 ดาวน์โหลดเป็น Excel (.xlsx) - {ticker}",
+      data=excel_data,
+      file_name=f"VI_Pyramid_Plan_{ticker}.xlsx",
+      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  )
+
+with btn_col2:
+  st.download_button(
+      label=f"📄 ดาวน์โหลดเป็น CSV (.csv) - {ticker}",
+      data=csv_data,
+      file_name=f"VI_Pyramid_Plan_{ticker}.csv",
+      mime="text/csv",
+  )
