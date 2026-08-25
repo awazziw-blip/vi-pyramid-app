@@ -6,20 +6,133 @@ from PIL import Image
 import streamlit as st
 
 # ==========================================
-# 🎨 1. Page Configuration & Dark Theme UI
+# 🏛️ 1. Institutional Stock Database (ฐานข้อมูลมูลค่าหุ้น)
+# ==========================================
+STOCK_DB = {
+    "EGCO": {
+        "fv": 118.00,
+        "tier": "Medium",
+        "shares": 1799,
+        "avg": 133.40,
+        "budget": 300000.0,
+    },
+    "TISCO": {
+        "fv": 110.00,
+        "tier": "Defensive",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "SAWAD": {
+        "fv": 38.50,
+        "tier": "Medium",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "SPA": {
+        "fv": 7.00,
+        "tier": "Medium",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "WHAUP": {
+        "fv": 4.80,
+        "tier": "Defensive",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "BDMS": {
+        "fv": 27.00,
+        "tier": "Defensive",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "CPALL": {
+        "fv": 65.00,
+        "tier": "Defensive",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "ADVANC": {
+        "fv": 403.00,
+        "tier": "Defensive",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+    "WHART": {
+        "fv": 11.20,
+        "tier": "Defensive",
+        "shares": 0,
+        "avg": 0.0,
+        "budget": 100000.0,
+    },
+}
+
+# ==========================================
+# 🎨 2. Page Configuration & White Text UI Theme
 # ==========================================
 st.set_page_config(
     page_title="VI Pyramid & Portfolio Engine", page_icon="📈", layout="wide"
 )
 
+# บังคับสีตัวอักษรเป็นสีขาวบริสุทธิ์ (#FFFFFF) ทุกจุดในระบบ
 st.markdown(
     """
 <style>
-    .stApp { background-color: #0b0f19; color: #e2e8f0; }
-    .metric-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 15px; margin-bottom: 10px; }
-    table { width: 100% !important; border-collapse: collapse; }
-    th { background-color: #1e293b !important; color: #38bdf8 !important; }
-    .stDownloadButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .stApp { background-color: #0b0f19; }
+    
+    /* บังคับตัวหนังสือสีขาวทั้งหมด */
+    p, span, label, div, h1, h2, h3, h4, h5, h6, .stMarkdown, .stText {
+        color: #FFFFFF !important;
+    }
+    
+    /* ตัวเลข Metrics Dashboard */
+    [data-testid="stMetricValue"] {
+        color: #38bdf8 !important;
+        font-weight: bold !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #FFFFFF !important;
+    }
+    
+    /* ตารางผลลัพธ์ */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    th {
+        background-color: #1e293b !important;
+        color: #38bdf8 !important;
+        font-weight: bold !important;
+        border: 1px solid #334155 !important;
+        padding: 10px !important;
+    }
+    td {
+        background-color: #0f172a !important;
+        color: #FFFFFF !important;
+        border: 1px solid #334155 !important;
+        padding: 8px !important;
+    }
+    
+    /* กล่องข้อความและอินพุต */
+    input, select, textarea {
+        color: #FFFFFF !important;
+        background-color: #1e293b !important;
+    }
+    .stDownloadButton>button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: bold;
+        background-color: #1e293b !important;
+        color: #FFFFFF !important;
+        border: 1px solid #38bdf8 !important;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -32,7 +145,30 @@ st.caption(
 )
 
 # ==========================================
-# 📸 2. Gemini Vision AI Scanner (OCR พอร์ต)
+# 🔄 3. State Management & Auto-Update Engine
+# ==========================================
+if "selected_stock" not in st.session_state:
+  st.session_state.selected_stock = "EGCO"
+  st.session_state.fair_value = STOCK_DB["EGCO"]["fv"]
+  st.session_state.risk_tier = STOCK_DB["EGCO"]["tier"]
+  st.session_state.curr_shares = STOCK_DB["EGCO"]["shares"]
+  st.session_state.curr_avg = STOCK_DB["EGCO"]["avg"]
+  st.session_state.total_budget = STOCK_DB["EGCO"]["budget"]
+
+
+def update_stock_parameters():
+  ticker = st.session_state.ticker_selector.upper().strip()
+  if ticker in STOCK_DB:
+    data = STOCK_DB[ticker]
+    st.session_state.fair_value = data["fv"]
+    st.session_state.risk_tier = data["tier"]
+    st.session_state.curr_shares = data["shares"]
+    st.session_state.curr_avg = data["avg"]
+    st.session_state.total_budget = data["budget"]
+
+
+# ==========================================
+# 📸 4. Gemini Vision AI Scanner (OCR พอร์ต)
 # ==========================================
 with st.expander("📸 อัปโหลดรูปภาพพอร์ต (Streaming Screenshot Scanner)", expanded=False):
   uploaded_file = st.file_uploader(
@@ -61,39 +197,78 @@ with st.expander("📸 อัปโหลดรูปภาพพอร์ต (S
       )
       st.success("✅ ดึงข้อมูลพอร์ตสำเร็จ!")
       st.json(parsed_data)
+
+      # อัปเดตค่าเข้าสู่ระบบทันทีหากพบหุ้น
+      if parsed_data:
+        first_stock = parsed_data[0]
+        sym = first_stock.get("symbol", "").upper()
+        if sym in STOCK_DB:
+          st.session_state.ticker_selector = sym
+          update_stock_parameters()
+        st.session_state.curr_shares = int(first_stock.get("shares", 0))
+        st.session_state.curr_avg = float(first_stock.get("avg_cost", 0.0))
+        st.rerun()
     except Exception as e:
       st.error(f"เกิดข้อผิดพลาดในการอ่านภาพ: {e}")
 
 # ==========================================
-# ⚙️ 3. Sidebar: Input Parameters
+# ⚙️ 5. Sidebar: Input Parameters
 # ==========================================
 st.sidebar.header("⚙️ ข้อมูลหุ้นและงบประมาณ")
-ticker = st.sidebar.text_input("ชื่อย่อหุ้น (Symbol)", value="EGCO").upper()
-fair_value = st.sidebar.number_input(
-    "มูลค่าเหมาะสม (Fair Value : บาท)", value=118.00, step=0.5
+
+# กล่องเลือก/พิมพ์ชื่อหุ้น (เปลี่ยนชื่อแล้วตัวเลขจะเปลี่ยนตามทันที)
+stock_list = list(STOCK_DB.keys())
+selected_ticker = st.sidebar.selectbox(
+    "เลือกหุ้นจากฐานข้อมูล (Auto-Fill):",
+    stock_list,
+    key="ticker_selector",
+    on_change=update_stock_parameters,
 )
+
+custom_ticker = st.sidebar.text_input(
+    "หรือพิมพ์ชื่อหุ้นเอง (Manual):", value=selected_ticker
+).upper()
+
+fair_value = st.sidebar.number_input(
+    "มูลค่าเหมาะสม (Fair Value : บาท)",
+    key="fair_value",
+    step=0.5,
+    format="%.2f",
+)
+
+tier_options = ["Defensive", "Medium", "Cyclical"]
 risk_tier = st.sidebar.selectbox(
-    "ระดับความเสี่ยง (Risk Tier)", ["Defensive", "Medium", "Cyclical"], index=1
+    "ระดับความเสี่ยง (Risk Tier)",
+    tier_options,
+    index=tier_options.index(st.session_state.risk_tier)
+    if st.session_state.risk_tier in tier_options
+    else 1,
+    key="risk_tier",
 )
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📊 สถานะพอร์ตปัจจุบัน")
-curr_shares = st.sidebar.number_input("จำนวนหุ้นที่มีอยู่", value=1799, step=100)
+curr_shares = st.sidebar.number_input(
+    "จำนวนหุ้นที่มีอยู่", key="curr_shares", step=100
+)
 curr_avg = st.sidebar.number_input(
-    "ราคาต้นทุนเฉลี่ยปัจจุบัน (บาท)", value=133.40, step=0.1
+    "ราคาต้นทุนเฉลี่ยปัจจุบัน (บาท)", key="curr_avg", step=0.1, format="%.2f"
 )
 curr_cost = curr_shares * curr_avg
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 งบประมาณลงทุน")
 total_budget = st.sidebar.number_input(
-    "งบลงทุนทั้งหมดที่ตั้งเป้าไว้ (บาท)", value=300000, step=10000
+    "งบลงทุนทั้งหมดที่ตั้งเป้าไว้ (บาท)",
+    key="total_budget",
+    step=10000.0,
+    format="%.2f",
 )
 pyramid_budget = max(0.0, total_budget - curr_cost)
 st.sidebar.info(f"💵 งบสำรองสำหรับซื้อพีระมิด: **{pyramid_budget:,.2f} บาท**")
 
 # ==========================================
-# 📐 4. Core Mathematical Engine
+# 📐 6. Core Mathematical Engine
 # ==========================================
 # 1) Dynamic MOS & TP Intervals
 if risk_tier == "Defensive":
@@ -223,10 +398,10 @@ for idx, (p, s, f, avg_c, r) in enumerate(
 df_output = pd.DataFrame(table_rows)
 
 # ==========================================
-# 📊 5. Render Output Dashboard
+# 📊 7. Render Output Dashboard
 # ==========================================
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("ชื่อหุ้น", ticker)
+col1.metric("ชื่อหุ้น", custom_ticker)
 col2.metric("มูลค่าเหมาะสม (Fair Value)", f"{fair_value:.2f} บาท")
 col3.metric("ต้นทุนเฉลี่ยเดิม", f"{curr_avg:.2f} บาท")
 col4.metric("ต้นทุนเฉลี่ยใหม่ (เมื่อซื้อครบ)", f"{final_avg_price:.2f} บาท")
@@ -235,32 +410,30 @@ st.markdown("### 📊 ตารางแผนการลงทุน Pyramid �
 st.table(df_output)
 
 # ==========================================
-# 📥 6. Export Functions (Excel & CSV)
+# 📥 8. Export Functions (Excel & CSV)
 # ==========================================
 st.markdown("### 📥 ดาวน์โหลดรายงานแผนการลงทุน")
 btn_col1, btn_col2 = st.columns(2)
 
-# ฟังก์ชันแปลงเป็น Excel ใน Memory
 excel_buffer = io.BytesIO()
 with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-  df_output.to_excel(writer, index=False, sheet_name=f"Plan_{ticker}")
+  df_output.to_excel(writer, index=False, sheet_name=f"Plan_{custom_ticker}")
 excel_data = excel_buffer.getvalue()
 
-# ฟังก์ชันแปลงเป็น CSV (utf-8-sig รองรับภาษาไทยใน Excel)
 csv_data = df_output.to_csv(index=False).encode("utf-8-sig")
 
 with btn_col1:
   st.download_button(
-      label=f"📊 ดาวน์โหลดเป็น Excel (.xlsx) - {ticker}",
+      label=f"📊 ดาวน์โหลดเป็น Excel (.xlsx) - {custom_ticker}",
       data=excel_data,
-      file_name=f"VI_Pyramid_Plan_{ticker}.xlsx",
+      file_name=f"VI_Pyramid_Plan_{custom_ticker}.xlsx",
       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   )
 
 with btn_col2:
   st.download_button(
-      label=f"📄 ดาวน์โหลดเป็น CSV (.csv) - {ticker}",
+      label=f"📄 ดาวน์โหลดเป็น CSV (.csv) - {custom_ticker}",
       data=csv_data,
-      file_name=f"VI_Pyramid_Plan_{ticker}.csv",
+      file_name=f"VI_Pyramid_Plan_{custom_ticker}.csv",
       mime="text/csv",
   )
